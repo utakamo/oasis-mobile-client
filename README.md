@@ -16,7 +16,7 @@ https://github.com/utakamo/oasis?tab=readme-ov-file#ai-setting
 https://github.com/utakamo/oasis?tab=readme-ov-file#oasis-rpc-json-rpc20
 
 # 3. LOGIN
-<img width="561" height="345" alt="image" src="https://github.com/user-attachments/assets/f7a3bfa3-3081-4a0c-be0a-046754e8b5af" />
+<img width="1224" height="841" alt="oasis-chat01" src="https://github.com/user-attachments/assets/88cd9f7f-2b31-414c-9033-8441f7190045" />
 
 # 4. AI CHAT
-<img width="446" height="334" alt="image" src="https://github.com/user-attachments/assets/4ff92a60-2198-456d-8848-525cddbb516b" />
+<img width="239" height="508" alt="oasis-chat02" src="https://github.com/user-attachments/assets/9ee5b3cc-df0e-4ad8-82a5-9f2302bdda90" />
