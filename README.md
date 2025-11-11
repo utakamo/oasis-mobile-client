@@ -20,3 +20,7 @@ https://github.com/utakamo/oasis?tab=readme-ov-file#oasis-rpc-json-rpc20
 
 # 4. AI CHAT
 <img width="239" height="508" alt="oasis-chat02" src="https://github.com/user-attachments/assets/9ee5b3cc-df0e-4ad8-82a5-9f2302bdda90" />
+
+# Note
+1. Login - Discover Devices button  
+ ---> OpenWrt avahi-daemon required
