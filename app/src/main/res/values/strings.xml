@@ -1,0 +1,52 @@
+<resources>
+    <string name="app_name">oasis-mobile-client</string>
+    <string name="oasis_title">Oasis</string>
+    <string name="reboot_required">A reboot is required.</string>
+    <string name="close">Close</string>
+    <string name="latest">Latest</string>
+    <string name="send">Send</string>
+    <string name="enter_message">Type a message</string>
+    <string name="system_message_label">System Message:</string>
+    <string name="copied">Copied</string>
+    <string name="copy">Copy</string>
+    <string name="quote">Quote</string>
+    <string name="retry">Retry</string>
+    <string name="system_messages">System Messages</string>
+    <string name="select">Select</string>
+    <string name="history">History</string>
+    <string name="select_chat">Select chat</string>
+    <string name="new_chat">New chat</string>
+    <string name="voice_on">Voice: ON</string>
+    <string name="voice_off">Voice: OFF</string>
+    <string name="settings">Settings</string>
+    <string name="logout">Logout</string>
+    <string name="tools">Tool List</string>
+    <string name="speech_rate">Speech rate</string>
+    <string name="speech_pitch">Speech pitch</string>
+    <string name="language">Language</string>
+    <string name="english">English</string>
+    <string name="japanese">Japanese</string>
+    <string name="tool_run">Tool</string>
+    <string name="assistant">assistant</string>
+    <string name="user">user</string>
+    <!-- LoginScreen -->
+    <string name="protocol">Protocol</string>
+    <string name="http">HTTP</string>
+    <string name="https">HTTPS</string>
+    <string name="ip_address">IP Address</string>
+    <string name="discover_devices">Discover Devices</string>
+    <string name="discovery_hint_manual_ip">No devices found. Please enter IP address manually.</string>
+    <string name="user_id">User ID</string>
+    <string name="password">Password</string>
+    <string name="login">LOGIN</string>
+    <string name="discovered_devices">Discovered Devices</string>
+    <string name="error">Error</string>
+    <string name="ok">OK</string>
+    <!-- Errors -->
+    <string name="no_devices_found">No devices found.</string>
+    <string name="discovery_failed">Discovery failed: %1$s</string>
+    <string name="send_failed">Send failed: %1$s</string>
+    <string name="retry_failed">Retry failed: %1$s</string>
+    <string name="history_load_failed">Failed to load history: %1$s</string>
+    <string name="connection_failed">Connection failed: %1$s</string>
+</resources>
