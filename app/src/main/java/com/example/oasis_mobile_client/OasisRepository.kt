@@ -44,7 +44,7 @@ class OasisRepository(private val context: Context) {
         private const val UBUS_METHOD_LIST = "list"
         private const val UBUS_METHOD_LOAD = "load"
         private const val UBUS_OBJECT_OASIS_TOOL = "oasis.rpc.tool"
-        private const val UBUS_METHOD_GET_TOOL_INFO = "get_tool_info"
+        private const val UBUS_METHOD_GET_TOOL_LIST = "get_tool_list"
         private const val UBUS_METHOD_SET_TOOL_ENABLED = "set_tool_enabled"
         private const val UBUS_METHOD_SET_TOOL_DISABLED = "set_tool_disabled"
         private val NSD_SERVICE_TYPES = listOf(
@@ -186,11 +186,11 @@ class OasisRepository(private val context: Context) {
     @kotlinx.serialization.Serializable
     data class ToolInfo(val name: String, val server: String, val enabled: Boolean)
 
-    suspend fun getToolInfo(sessionId: String): List<ToolInfo> {
+    suspend fun getToolList(sessionId: String): List<ToolInfo> {
         val requestParams = buildJsonArray {
             add(sessionId)
             add(UBUS_OBJECT_OASIS_TOOL)
-            add(UBUS_METHOD_GET_TOOL_INFO)
+            add(UBUS_METHOD_GET_TOOL_LIST)
             add(buildJsonObject { })
         }
         val request = JsonRpcRequest(method = JsonRpcRequest.METHOD_CALL, params = requestParams)

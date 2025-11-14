@@ -199,7 +199,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
         val sid = sessionId ?: return
         viewModelScope.launch {
             _toolsLoading.value = true
-            runCatching { repository.getToolInfo(sid) }
+            runCatching { repository.getToolList(sid) }
                 .onSuccess { list ->
                     _tools.value = list.map { ToolItem(it.name, it.server, it.enabled) }
                 }
