@@ -54,7 +54,7 @@ class OasisRepository(private val context: Context) {
             "_ubus._tcp.",
             "_http._tcp."
         )
-        private const val DISCOVERY_TIMEOUT_MS = 15000L
+        private const val DISCOVERY_TIMEOUT_MS = 5000L
     }
 
     @SuppressLint("UnsafeOptInUsageError")
