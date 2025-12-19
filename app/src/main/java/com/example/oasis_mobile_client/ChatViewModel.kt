@@ -44,6 +44,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
     private val repository = OasisRepository(application)
     private var sessionId: String? = null
     private var chatId: String = ""
+    private var lastIpAddress: String? = null
     private var lastUsername: String? = null
     private var lastPassword: String? = null
 
@@ -217,8 +218,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             runCatching { repository.setToolEnable(sid, name, enabled) }
                 .onSuccess {
-                    // Re-fetch latest state on success
-                    refreshTools()
+                    // Success - state already updated optimistically
                 }
                 .onFailure { e ->
                     // Roll back on failure
@@ -268,6 +268,13 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun login(ipAddress: String, username: String, password: String) {
+        if (ipAddress.contains("oasis-device-ip", ignoreCase = true)) {
+            _loginState.value = LoginState.Error("Please enter a valid IP address.")
+            return
+        }
+        lastIpAddress = ipAddress
+        lastUsername = username
+        lastPassword = password
         viewModelScope.launch {
             _loginState.value = LoginState.Loading
             try {
@@ -275,8 +282,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 val withScheme = if (raw.startsWith("http://") || raw.startsWith("https://")) raw else "http://$raw"
                 val baseUrl = if (withScheme.endsWith("/")) withScheme else "$withScheme/"
                 RetrofitClient.updateBaseUrl(baseUrl)
-                lastUsername = username
-                lastPassword = password
+                
                 val session = repository.login(LoginParams(username, password))
                 sessionId = session
                 val base = repository.getBaseInfo(session)
@@ -306,9 +312,20 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (e: Exception) {
                 val msg = getApplication<Application>().getString(R.string.connection_failed, e.message ?: "")
                 Log.e(TAG, "login failed", e)
-                messages.add(Message(msg, isUser = false))
+                // messages.add(Message(msg, isUser = false)) // Don't add login error to chat history
                 _loginState.value = LoginState.Error(msg)
             }
+        }
+    }
+
+    fun retryLogin() {
+        val ip = lastIpAddress
+        val user = lastUsername
+        val pass = lastPassword
+        if (!ip.isNullOrBlank() && !user.isNullOrBlank() && !pass.isNullOrBlank()) {
+            login(ip, user, pass)
+        } else {
+            _loginState.value = LoginState.Idle
         }
     }
 
@@ -334,68 +351,6 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
         _selectedSysmsgKey.value = key
     }
 
-    private fun formatUciProposal(el: JsonElement?): String? {
-        if (el == null) return null
-        val obj = el.jsonObject
-        val notify = obj["uci_notify"]?.jsonPrimitive?.booleanOrNull ?: false
-        if (!notify) return null
-        val list = obj["uci_list"]?.jsonObject ?: return "UCI提案があります。"
-        fun linesOf(name: String): List<String> {
-            val arr = list[name]?.jsonArray ?: return emptyList()
-            return arr.mapNotNull { item ->
-                val o = item.jsonObject
-                o["param"]?.jsonPrimitive?.content
-            }
-        }
-        val parts = mutableListOf<String>()
-        val sections = listOf("set","add","delete","add_list","del_list","reorder")
-        for (s in sections) {
-            val lines = linesOf(s)
-            if (lines.isNotEmpty()) {
-                parts.add("$s:\n" + lines.joinToString("\n") { "  $it" })
-            }
-        }
-        if (parts.isEmpty()) return "UCI提案があります。"
-        return "UCI提案:\n" + parts.joinToString("\n")
-    }
-
-    private fun parseToolLabel(el: JsonElement?): String? {
-        if (el == null) return null
-        return runCatching {
-            val obj = when {
-                (el is kotlinx.serialization.json.JsonPrimitive) && el.isString ->
-                    runCatching { Json.parseToJsonElement(el.content).jsonObject }.getOrNull()
-                else -> el.jsonObject
-            } ?: return@runCatching null
-
-            if (obj.isEmpty()) return@runCatching null
-
-            obj["name"]?.jsonPrimitive?.content
-                ?: obj["tool"]?.jsonPrimitive?.content
-                ?: obj["tools"]?.jsonArray?.mapNotNull {
-                    runCatching { it.jsonObject["name"]?.jsonPrimitive?.content ?: it.jsonPrimitive.content }.getOrNull()
-                }?.filter { it.isNotBlank() }?.joinToString(", ")?.ifBlank { null }
-                ?: obj["tool_outputs"]?.jsonArray?.mapNotNull {
-                    it.jsonObject["name"]?.jsonPrimitive?.content
-                }?.filter { it.isNotBlank() }?.joinToString(", ")?.ifBlank { null }
-        }.getOrNull()
-    }
-
-    private fun extractToolNamesFromContentIfJson(text: String): String? {
-        return runCatching {
-            val trimmed = text.trimStart()
-            if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null
-            val root = Json.parseToJsonElement(text)
-            val o = root.jsonObject
-            o["tool_outputs"]?.jsonArray?.mapNotNull {
-                it.jsonObject["name"]?.jsonPrimitive?.content
-            }?.filter { it.isNotBlank() }?.joinToString(", ")?.takeIf { it.isNotBlank() }
-                ?: o["tools"]?.jsonArray?.mapNotNull {
-                    runCatching { it.jsonObject["name"]?.jsonPrimitive?.content ?: it.jsonPrimitive.content }.getOrNull()
-                }?.filter { it.isNotBlank() }?.joinToString(", ")?.takeIf { it.isNotBlank() }
-        }.getOrNull()
-    }
-
     fun sendMessage() {
         val currentSessionId = sessionId ?: return
         if (inputText.isBlank()) return
@@ -412,9 +367,9 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 result.id?.let { if (it.isNotBlank()) chatId = it } // Save chat ID for next time (update if present)
                 if (!result.title.isNullOrBlank()) { _chatTitle.value = result.title }
                 run {
-                    var label = parseToolLabel(result.toolInfo)
+                    var label = OasisJsonParser.parseToolLabel(result.toolInfo)
                     var text = result.content
-                    val namesFromText = extractToolNamesFromContentIfJson(text)
+                    val namesFromText = OasisJsonParser.extractToolNamesFromContentIfJson(text)
                     if (label == null && namesFromText != null) {
                         label = namesFromText
                     }
@@ -423,7 +378,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                     messages.add(Message(text, false, toolUsed = (label != null), toolLabel = label))
                 }
-                formatUciProposal(result.uciParseTbl)?.let { messages.add(Message(it, false)) }
+                OasisJsonParser.formatUciProposal(result.uciParseTbl)?.let { messages.add(Message(it, false)) }
                 if (result.reboot == true) { _rebootBanner.value = true }
                 refreshHistory()
             } catch (e: Exception) {
@@ -438,9 +393,9 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                         retry.id?.let { if (it.isNotBlank()) chatId = it }
                         if (!retry.title.isNullOrBlank()) { _chatTitle.value = retry.title }
                         run {
-                            var label = parseToolLabel(retry.toolInfo)
+                            var label = OasisJsonParser.parseToolLabel(retry.toolInfo)
                             var text = retry.content
-                            val namesFromText = extractToolNamesFromContentIfJson(text)
+                            val namesFromText = OasisJsonParser.extractToolNamesFromContentIfJson(text)
                             if (label == null && namesFromText != null) {
                                 label = namesFromText
                             }
@@ -449,7 +404,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                             }
                             messages.add(Message(text, false, toolUsed = (label != null), toolLabel = label))
                         }
-                        formatUciProposal(retry.uciParseTbl)?.let { messages.add(Message(it, false)) }
+                        OasisJsonParser.formatUciProposal(retry.uciParseTbl)?.let { messages.add(Message(it, false)) }
                         if (retry.reboot == true) { _rebootBanner.value = true }
                         refreshHistory()
                         return@launch
@@ -482,9 +437,9 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 result.id?.let { if (it.isNotBlank()) chatId = it }
                 if (!result.title.isNullOrBlank()) { _chatTitle.value = result.title }
                 run {
-                    var label = parseToolLabel(result.toolInfo)
+                    var label = OasisJsonParser.parseToolLabel(result.toolInfo)
                     var text = result.content
-                    val namesFromText = extractToolNamesFromContentIfJson(text)
+                    val namesFromText = OasisJsonParser.extractToolNamesFromContentIfJson(text)
                     if (label == null && namesFromText != null) {
                         label = namesFromText
                     }
@@ -493,7 +448,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                     messages.add(Message(text, false, toolUsed = (label != null), toolLabel = label))
                 }
-                formatUciProposal(result.uciParseTbl)?.let { messages.add(Message(it, false)) }
+                OasisJsonParser.formatUciProposal(result.uciParseTbl)?.let { messages.add(Message(it, false)) }
                 if (result.reboot == true) { _rebootBanner.value = true }
                 lastFailedMessage = null
                 refreshHistory()

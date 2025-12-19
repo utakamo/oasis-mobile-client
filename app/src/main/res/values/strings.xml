@@ -49,4 +49,5 @@
     <string name="retry_failed">Retry failed: %1$s</string>
     <string name="history_load_failed">Failed to load history: %1$s</string>
     <string name="connection_failed">Connection failed: %1$s</string>
+    <string name="reconfigure">Re-configure</string>
 </resources>

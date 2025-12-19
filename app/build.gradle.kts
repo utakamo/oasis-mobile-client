@@ -17,9 +17,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
 
-        // Package only English resources
-        resourceConfigurations += listOf("en")
+    androidResources {
+        localeFilters += "en"
     }
 
     buildTypes {
@@ -54,7 +55,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("io.github.jeziellago:compose-markdown:0.5.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
 
     // Retrofit

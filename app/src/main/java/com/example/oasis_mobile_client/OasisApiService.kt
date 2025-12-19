@@ -88,7 +88,7 @@ data class SendResult(
 
 // region Retrofit Client
 object RetrofitClient {
-    private var BASE_URL = "http://192.168.1.1/"
+    private var BASE_URL = "http://oasis-device-ip/"
 
     private val json = Json {
         ignoreUnknownKeys = true

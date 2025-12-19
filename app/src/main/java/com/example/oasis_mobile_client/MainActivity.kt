@@ -2,12 +2,8 @@ package com.example.oasis_mobile_client
 
 import android.app.Activity
 import android.app.Application
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
-import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -36,16 +32,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -85,24 +82,22 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.oasis_mobile_client.ui.theme.OasismobileclientTheme
-import dev.jeziellago.compose.markdowntext.MarkdownText
+import com.example.oasis_mobile_client.MarkdownParser
 import kotlinx.coroutines.launch
 import java.util.Locale
-
-// Data model
-data class Message(
-    val text: String,
-    val isUser: Boolean,
-    val toolUsed: Boolean = false,
-    val toolLabel: String? = null,
-    val id: Long = System.nanoTime()
-)
+import androidx.compose.material3.ColorScheme
 
 class MainActivity : ComponentActivity() {
     private val chatViewModel: ChatViewModel by viewModels()
@@ -127,6 +122,7 @@ class MainActivity : ComponentActivity() {
                             chatViewModel.login(ip, userId, password)
                         },
                         onDiscoverClick = { chatViewModel.discoverOasisDevices() },
+                        onRetryLogin = { chatViewModel.retryLogin() },
                         loginState = loginState,
                         discoveryState = discoveryState,
                         onDismissDialog = { chatViewModel.clearDiscoveryState() },
@@ -166,56 +162,19 @@ fun ChatScreen(viewModel: ChatViewModel) {
 
     // Initialize/release TextToSpeech and speak messages
     val context = LocalContext.current
-    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
-    val audioManager = LocalContext.current.getSystemService(AudioManager::class.java)
-    var focusRequest by remember { mutableStateOf<AudioFocusRequest?>(null) }
-
-    LaunchedEffect(Unit) {
-        tts = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                val initLocale = Locale.US
-                val available = tts?.isLanguageAvailable(initLocale) ?: TextToSpeech.LANG_NOT_SUPPORTED
-                tts?.language = if (available >= TextToSpeech.LANG_AVAILABLE) initLocale else Locale.US
-                tts?.setSpeechRate(speechRate)
-                tts?.setPitch(speechPitch)
-                val attrs =
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                tts?.setAudioAttributes(attrs)
-                focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                    .setAudioAttributes(attrs)
-                    .setOnAudioFocusChangeListener { }
-                    .build()
-
-                tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-                    override fun onStart(utteranceId: String?) {}
-                    override fun onDone(utteranceId: String?) {
-                        focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
-                    }
-                    @Deprecated("Deprecated in Java")
-                    override fun onError(utteranceId: String?) {
-                        android.util.Log.e("MainActivity", "TTS speak error: $utteranceId")
-                        focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
-                    }
-                })
-            }
-        }
-    }
+    val ttsManager = remember { TextToSpeechManager(context) }
 
     LaunchedEffect(speechRate) {
-        tts?.setSpeechRate(speechRate)
+        ttsManager.setSpeechRate(speechRate)
     }
 
     LaunchedEffect(speechPitch) {
-        tts?.setPitch(speechPitch)
+        ttsManager.setPitch(speechPitch)
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            tts?.stop()
-            tts?.shutdown()
+            ttsManager.shutdown()
         }
     }
 
@@ -232,10 +191,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
         for (i in lastSpokenIndex until msgs.size) {
             val m = msgs[i]
             if (!m.isUser && !m.text.startsWith("UCI提案")) {
-                val spoken = markdownToPlain(m.text)
+                val spoken = MarkdownParser.markdownToPlain(m.text)
                 if (spoken.isNotBlank()) {
-                    focusRequest?.let { audioManager?.requestAudioFocus(it) }
-                    tts?.speak(spoken, TextToSpeech.QUEUE_ADD, null, "msg_$i")
+                    ttsManager.speak(spoken, "msg_$i")
                 }
             }
         }
@@ -287,9 +245,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         // Voice mode toggle (speaker)
                         IconButton(onClick = { viewModel.toggleVoiceEnabled() }) {
                             if (voiceEnabled) {
-                                Icon(Icons.Filled.VolumeUp, contentDescription = stringResource(R.string.voice_on))
+                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = stringResource(R.string.voice_on))
                             } else {
-                                Icon(Icons.Filled.VolumeOff, contentDescription = stringResource(R.string.voice_off))
+                                Icon(Icons.AutoMirrored.Filled.VolumeOff, contentDescription = stringResource(R.string.voice_off))
                             }
                         }
                         // New chat
@@ -522,6 +480,7 @@ fun HistoryDialog(
     }
 }
 
+@Suppress("DEPRECATION")
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageItem(message: Message, onQuoteRequested: (String) -> Unit) {
@@ -579,7 +538,7 @@ fun MessageItem(message: Message, onQuoteRequested: (String) -> Unit) {
                         if (message.isUser) {
                             Text(text = message.text)
                         } else {
-                            MarkdownText(markdown = message.text)
+                            Text(text = MarkdownParser.parseMarkdown(message.text, MaterialTheme.colorScheme))
                         }
                     }
                 }
@@ -635,7 +594,7 @@ fun MessageInput(
                     if (!enabled && value.isNotBlank()) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     } else {
-                        Icon(Icons.Filled.Send, contentDescription = stringResource(R.string.send))
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
                     }
                 }
             }
@@ -723,7 +682,7 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 // Speech rate
-                Text(text = stringResource(R.string.speech_rate) + " x" + String.format("%.1f", currentRate))
+                Text(text = stringResource(R.string.speech_rate) + " x" + String.format(Locale.US, "%.1f", currentRate))
                 Slider(
                     value = currentRate,
                     onValueChange = { onChangeSpeechRate(it) },
@@ -731,7 +690,7 @@ fun SettingsDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 // Speech pitch
-                Text(text = stringResource(R.string.speech_pitch) + " x" + String.format("%.1f", currentPitch))
+                Text(text = stringResource(R.string.speech_pitch) + " x" + String.format(Locale.US, "%.1f", currentPitch))
                 Slider(
                     value = currentPitch,
                     onValueChange = { onChangeSpeechPitch(it) },
@@ -796,6 +755,7 @@ fun ToolsDialog(
     }
 }
 
+@Suppress("DEPRECATION")
 @Composable
 fun UciBlock(text: String) {
     var copied by remember { mutableStateOf(false) }
@@ -838,32 +798,6 @@ fun ToolChip(label: String?) {
     }
 }
 
-private fun markdownToPlain(text: String): String {
-    // Fenced code blocks ``` ... ```
-    var s = text.replace(Regex("```[\\s\\S]*?```", RegexOption.MULTILINE), " ")
-    // Inline code `code`
-    s = s.replace(Regex("`[^`]*`"), " ")
-    // Remove images ![alt](url)
-    s = s.replace(Regex("!\\[[^\\]]*]\\([^\\)]*\\)"), " ")
-    // Convert links [text](url) to plain text
-    s = s.replace(Regex("\\[([^\\]]+)]\\([^\\)]*\\)"), "$1")
-    // Remove per-line blockquotes and list markers; replace table separators with spaces
-    s = s.lines().joinToString(" ") { line ->
-        var l = line
-        l = l.replace(Regex("^\\s{0,3}>\\s?"), "")
-        l = l.replace(Regex("^\\s*([-*+]|\\d+\\.)\\s+"), "")
-        l = l.replace("|", " ")
-        l.trim()
-    }
-    // Remove emphasis markers * _ ** __
-    s = s.replace(Regex("([*_]{1,3}|__)"), "")
-    // Remove HTML tags
-    s = s.replace(Regex("<[^>]+>"), " ")
-    // Normalize extra spaces
-    s = s.replace(Regex("\\s+"), " ").trim()
-    return s
-}
-
 @Composable
 fun AiServiceSelector(
     items: List<ChatViewModel.AiServiceItem>,
@@ -871,59 +805,25 @@ fun AiServiceSelector(
     onSelect: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = items.firstOrNull { it.id == selectedId }?.label
-        ?: items.firstOrNull()?.label ?: "Service"
+    // If nothing selected, just show first item label or "Select"
+    val selectedItem = items.firstOrNull { it.id == selectedId }
+    val label = selectedItem?.label ?: "Select AI Model"
+
     Box {
         OutlinedButton(onClick = { expanded = true }) {
-            Text(selectedLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            items.forEach { s ->
+            items.forEach { item ->
                 DropdownMenuItem(
-                    text = { Text(s.label) },
+                    text = { Text(item.label) },
                     onClick = {
                         expanded = false
-                        onSelect(s.id)
+                        onSelect(item.id)
                     }
                 )
-            }
-        }
-    }
-}
-
-@Composable
-fun SysmsgSelector(
-    items: List<Pair<String, String>>, // (title, key)
-    selectedKey: String,
-    onSelect: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedTitle = items.firstOrNull { it.second == selectedKey }?.first ?: "default"
-
-    Surface(shadowElevation = 2.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = stringResource(R.string.system_message_label))
-            Spacer(modifier = Modifier.width(8.dp))
-            Box {
-                OutlinedButton(onClick = { expanded = true }) {
-                    Text(selectedTitle)
-                }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    items.forEach { (title, key) ->
-                        DropdownMenuItem(
-                            text = { Text(title) },
-                            onClick = {
-                                expanded = false
-                                onSelect(key)
-                            }
-                        )
-                    }
-                }
             }
         }
     }
@@ -947,6 +847,7 @@ fun LoginScreenPreview() {
         LoginScreen(
             onLoginClick = { _, _, _ -> },
             onDiscoverClick = {},
+            onRetryLogin = {},
             loginState = LoginState.Idle,
             discoveryState = DiscoveryState.Idle,
             onDismissDialog = {},

@@ -29,7 +29,7 @@ import kotlin.coroutines.resume
 
 class OasisRepository(private val context: Context) {
 
-    private val apiService = RetrofitClient.instance
+    private val apiService get() = RetrofitClient.instance
     private val json = Json { ignoreUnknownKeys = true }
 
     companion object {
@@ -43,8 +43,9 @@ class OasisRepository(private val context: Context) {
         private const val UBUS_METHOD_SEND = "send"
         private const val UBUS_METHOD_LIST = "list"
         private const val UBUS_METHOD_LOAD = "load"
-        private const val UBUS_OBJECT_OASIS_TOOL = "oasis.rpc.tool"
-        private const val UBUS_METHOD_GET_TOOL_LIST = "get_tool_list"
+        private const val UBUS_OBJECT_OASIS_TOOL_LIST = "oasis.tool.edge"
+        private const val UBUS_OBJECT_OASIS_TOOL_MANAGER = "oasis.tool.manager"
+        private const val UBUS_METHOD_TOOL_LIST = "tool_list"
         private const val UBUS_METHOD_SET_TOOL_ENABLED = "set_tool_enabled"
         private const val UBUS_METHOD_SET_TOOL_DISABLED = "set_tool_disabled"
         private val NSD_SERVICE_TYPES = listOf(
@@ -60,6 +61,7 @@ class OasisRepository(private val context: Context) {
     @kotlinx.serialization.Serializable
     data class DiscoveredDevice(val name: String, val ip: String, val port: Int)
 
+    @Suppress("DEPRECATION")
     suspend fun discoverDevices(): List<DiscoveredDevice> = suspendCancellableCoroutine { continuation ->
         val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
         val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -189,15 +191,15 @@ class OasisRepository(private val context: Context) {
     suspend fun getToolList(sessionId: String): List<ToolInfo> {
         val requestParams = buildJsonArray {
             add(sessionId)
-            add(UBUS_OBJECT_OASIS_TOOL)
-            add(UBUS_METHOD_GET_TOOL_LIST)
+            add(UBUS_OBJECT_OASIS_TOOL_LIST)
+            add(UBUS_METHOD_TOOL_LIST)
             add(buildJsonObject { })
         }
         val request = JsonRpcRequest(method = JsonRpcRequest.METHOD_CALL, params = requestParams)
         return makeRpcCall(request) { result ->
             val obj = result[1].jsonObject
             val list = mutableListOf<ToolInfo>()
-            obj["tool"]?.jsonArray?.forEach { e ->
+            obj["tools"]?.jsonObject?.values?.forEach { e ->
                 val o = e.jsonObject
                 val name = o["name"]?.jsonPrimitive?.content ?: return@forEach
                 val server = o["server"]?.jsonPrimitive?.content ?: ""
@@ -213,7 +215,7 @@ class OasisRepository(private val context: Context) {
         val method = if (enabled) UBUS_METHOD_SET_TOOL_ENABLED else UBUS_METHOD_SET_TOOL_DISABLED
         val requestParams = buildJsonArray {
             add(sessionId)
-            add(UBUS_OBJECT_OASIS_TOOL)
+            add(UBUS_OBJECT_OASIS_TOOL_MANAGER)
             add(method)
             add(buildJsonObject {
                 put("tool", name)

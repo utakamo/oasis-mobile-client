@@ -33,10 +33,13 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 
+import androidx.compose.material3.TextButton
+
 @Composable
 fun LoginScreen(
     onLoginClick: (String, String, String) -> Unit,
     onDiscoverClick: () -> Unit,
+    onRetryLogin: () -> Unit,
     loginState: LoginState,
     discoveryState: DiscoveryState,
     onDismissDialog: () -> Unit,
@@ -65,7 +68,11 @@ fun LoginScreen(
     }
 
     if (loginState is LoginState.Error) {
-        ErrorDialog(message = loginState.message, onDismiss = onDismissLoginError)
+        ErrorDialog(
+            message = loginState.message,
+            onDismiss = onDismissLoginError,
+            onRetry = onRetryLogin
+        )
     }
 
     Column(
@@ -171,15 +178,22 @@ fun DeviceDiscoveryDialog(
 }
 
 @Composable
-fun ErrorDialog(message: String, onDismiss: () -> Unit) {
+fun ErrorDialog(message: String, onDismiss: () -> Unit, onRetry: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.error)) },
         text = { Text(message) },
         confirmButton = {
-            Button(onClick = onDismiss) {
-                Text(stringResource(R.string.ok))
+            TextButton(onClick = onRetry) {
+                Text(stringResource(R.string.retry))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.reconfigure))
             }
         }
     )
 }
+
+
