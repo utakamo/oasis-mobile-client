@@ -15,6 +15,7 @@ class TextToSpeechManager(private val context: Context) {
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private var focusRequest: AudioFocusRequest? = null
     private var isInitialized = false
+    var onSpeakDone: (() -> Unit)? = null
 
     init {
         tts = TextToSpeech(context) { status ->
@@ -40,6 +41,7 @@ class TextToSpeechManager(private val context: Context) {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) {
                         abandonFocus()
+                        onSpeakDone?.invoke()
                     }
                     @Suppress("OVERRIDE_DEPRECATION")
                     @Deprecated("Deprecated in Java")

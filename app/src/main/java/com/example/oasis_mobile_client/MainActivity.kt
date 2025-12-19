@@ -98,6 +98,13 @@ import com.example.oasis_mobile_client.MarkdownParser
 import kotlinx.coroutines.launch
 import java.util.Locale
 import androidx.compose.material3.ColorScheme
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val chatViewModel: ChatViewModel by viewModels()
@@ -163,6 +170,16 @@ fun ChatScreen(viewModel: ChatViewModel) {
     // Initialize/release TextToSpeech and speak messages
     val context = LocalContext.current
     val ttsManager = remember { TextToSpeechManager(context) }
+    val sttManager = remember { SpeechRecognizerManager(context) }
+    val isListening by sttManager.isListening.collectAsStateWithLifecycle()
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            viewModel.setVoiceEnabled(true)
+        }
+    }
 
     LaunchedEffect(speechRate) {
         ttsManager.setSpeechRate(speechRate)
@@ -175,6 +192,25 @@ fun ChatScreen(viewModel: ChatViewModel) {
     DisposableEffect(Unit) {
         onDispose {
             ttsManager.shutdown()
+            sttManager.destroy()
+        }
+    }
+
+    // Callback when TTS finishes speaking
+    LaunchedEffect(Unit) {
+        ttsManager.onSpeakDone = {
+            if (viewModel.voiceEnabled.value) {
+                // Must run on Main Thread
+                coroutineScope.launch(Dispatchers.Main) {
+                    sttManager.startListening(
+                        onResult = { text ->
+                            viewModel.onInputTextChanged(text)
+                            viewModel.sendMessage()
+                        },
+                        onError = { /* Handle error or just stop listening */ }
+                    )
+                }
+            }
         }
     }
 
@@ -183,7 +219,22 @@ fun ChatScreen(viewModel: ChatViewModel) {
     LaunchedEffect(voiceEnabled) {
         // Avoid bulk reading of recent history when toggling voice mode
         lastSpokenIndex = viewModel.messages.size
+        
+        if (voiceEnabled) {
+             // If enabled, start listening immediately (if not speaking)
+             sttManager.startListening(
+                onResult = { text ->
+                    viewModel.onInputTextChanged(text)
+                    viewModel.sendMessage()
+                },
+                onError = {}
+             )
+        } else {
+            sttManager.stopListening()
+            ttsManager.stop()
+        }
     }
+
 
     LaunchedEffect(viewModel.messages.size) {
         if (!voiceEnabled) return@LaunchedEffect
@@ -243,9 +294,20 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     },
                     actions = {
                         // Voice mode toggle (speaker)
-                        IconButton(onClick = { viewModel.toggleVoiceEnabled() }) {
+                        IconButton(onClick = {
                             if (voiceEnabled) {
-                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = stringResource(R.string.voice_on))
+                                viewModel.setVoiceEnabled(false)
+                            } else {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                                    viewModel.setVoiceEnabled(true)
+                                } else {
+                                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                }
+                            }
+                        }) {
+                            if (voiceEnabled) {
+                                val iconColor = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = stringResource(R.string.voice_on), tint = iconColor)
                             } else {
                                 Icon(Icons.AutoMirrored.Filled.VolumeOff, contentDescription = stringResource(R.string.voice_off))
                             }
@@ -320,58 +382,63 @@ fun ChatScreen(viewModel: ChatViewModel) {
         }
     ) { paddingValues ->
         val bgBrush = Brush.verticalGradient(colors = listOf(Color(0xFFF7F7F7), Color(0xFFEDEBFF)))
-        Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .background(bgBrush)
+        Box(modifier = Modifier
+            .padding(paddingValues)
+            .fillMaxSize()
+            .background(bgBrush)
         ) {
-            // Show AI service selector at the top of the chat content
-            val services by viewModel.aiServices.collectAsStateWithLifecycle()
-            val selectedServiceId by viewModel.selectedServiceId.collectAsStateWithLifecycle()
-            if (services.isNotEmpty()) {
+            AudioVisualizer(isListening = isListening, rmsDbFlow = sttManager.rmsDb)
+
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Show AI service selector at the top of the chat content
+                val services by viewModel.aiServices.collectAsStateWithLifecycle()
+                val selectedServiceId by viewModel.selectedServiceId.collectAsStateWithLifecycle()
+                if (services.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AiServiceSelector(
+                            items = services,
+                            selectedId = selectedServiceId,
+                            onSelect = { viewModel.selectAiService(it) }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                // Message list area
                 Box(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    contentAlignment = Alignment.Center
                 ) {
-                    AiServiceSelector(
-                        items = services,
-                        selectedId = selectedServiceId,
-                        onSelect = { viewModel.selectAiService(it) }
+                    MessageList(
+                        messages = viewModel.messages,
+                        modifier = Modifier.fillMaxSize(),
+                        listState = listState,
+                        sending = sending,
+                        onQuoteRequested = { quote ->
+                            val quoted = quote.lines().joinToString("\n") { "> " + it } + "\n\n"
+                            inputText = quoted
+                            viewModel.onInputTextChanged(quoted)
+                        }
                     )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-
-            // Message list area
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) {
-                MessageList(
-                    messages = viewModel.messages,
-                    modifier = Modifier.fillMaxSize(),
-                    listState = listState,
-                    sending = sending,
-                    onQuoteRequested = { quote ->
-                        val quoted = quote.lines().joinToString("\n") { "> " + it } + "\n\n"
-                        inputText = quoted
-                        viewModel.onInputTextChanged(quoted)
-                    }
-                )
-                if (!atBottom && viewModel.messages.isNotEmpty()) {
-                    FloatingActionButton(
-                        onClick = {
-                            coroutineScope.launch { listState.animateScrollToItem(0) }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 12.dp)
-                    ) {
-                        Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.latest))
+                    if (!atBottom && viewModel.messages.isNotEmpty()) {
+                        FloatingActionButton(
+                            onClick = {
+                                coroutineScope.launch { listState.animateScrollToItem(0) }
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 12.dp)
+                        ) {
+                            Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.latest))
+                        }
                     }
                 }
             }
