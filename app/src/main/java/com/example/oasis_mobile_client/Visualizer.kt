@@ -14,45 +14,66 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 
+import androidx.compose.animation.core.InfiniteRepeatableSpec
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.MaterialTheme
+
 @Composable
 fun AudioVisualizer(isListening: Boolean, rmsDbFlow: StateFlow<Float>) {
-    if (!isListening) return
-
     val rmsDb by rmsDbFlow.collectAsStateWithLifecycle()
-    // Normalize RMS (-2 to 10 usually from Android SpeechRecognizer) to a scale factor.
-    // Values vary by device, but usually range from -2 (silence) to 10+ (loud).
-    val normalized = (rmsDb + 2f).coerceAtLeast(0.1f)
-    val targetScale = 1f + (normalized / 10f) 
-
-    // Smooth animation
-    val scale by animateFloatAsState(
-        targetValue = targetScale,
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
-        label = "visualizer_scale"
+    val infiniteTransition = rememberInfiniteTransition(label = "breathing")
+    
+    // Breathing scale for idle state
+    val idleScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "idle_scale"
     )
+
+    // Active scale from mic input
+    val normalized = (rmsDb + 2f).coerceAtLeast(0.1f)
+    val activeTargetScale = 1f + (normalized / 8f) 
+    
+    val activeScale by animateFloatAsState(
+        targetValue = if (isListening) activeTargetScale else 1.0f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "active_scale"
+    )
+
+    // Final scale depends on listening state
+    val finalScale = if (isListening) activeScale else idleScale
+    val baseAlpha = if (isListening) 0.2f else 0.05f
+    val color = MaterialTheme.colorScheme.primary
 
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        // Draw multiple circles with different opacities and scales
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = center
-            val baseRadius = size.minDimension / 4f
+            val baseRadius = size.minDimension / 3.5f
             
             drawCircle(
-                color = Color.Cyan.copy(alpha = 0.1f),
-                radius = baseRadius * scale * 1.5f,
+                color = color.copy(alpha = baseAlpha * 0.5f),
+                radius = baseRadius * finalScale * 1.5f,
                 center = center
             )
             drawCircle(
-                color = Color.Cyan.copy(alpha = 0.2f),
-                radius = baseRadius * scale * 1.25f,
+                color = color.copy(alpha = baseAlpha),
+                radius = baseRadius * finalScale * 1.25f,
                 center = center
             )
             drawCircle(
-                color = Color.Cyan.copy(alpha = 0.3f),
-                radius = baseRadius * scale,
+                color = color.copy(alpha = baseAlpha * 1.5f),
+                radius = baseRadius * finalScale,
                 center = center
             )
         }

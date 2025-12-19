@@ -35,6 +35,24 @@ import androidx.compose.ui.window.Dialog
 
 import androidx.compose.material3.TextButton
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lan
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Router
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+
 @Composable
 fun LoginScreen(
     onLoginClick: (String, String, String) -> Unit,
@@ -63,7 +81,7 @@ fun LoginScreen(
                 onDismiss = onDismissDialog
             )
         }
-        is DiscoveryState.Error -> { /* Do not show a dialog (only a red hint under the button) */ }
+        is DiscoveryState.Error -> { /* Do not show a dialog */ }
         else -> {}
     }
 
@@ -75,81 +93,148 @@ fun LoginScreen(
         )
     }
 
-    Column(
+    val textFieldColors = TextFieldDefaults.colors(
+        focusedIndicatorColor = Color.Transparent,
+        unfocusedIndicatorColor = Color.Transparent,
+        disabledIndicatorColor = Color.Transparent,
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    )
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.align(Alignment.Start),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = stringResource(R.string.https))
-            Spacer(modifier = Modifier.width(8.dp))
-            Switch(checked = useHttps, onCheckedChange = { useHttps = it })
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = ipAddress,
-            onValueChange = { ipAddress = it },
-            label = { Text(stringResource(R.string.ip_address)) },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = onDiscoverClick,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = discoveryState !is DiscoveryState.Searching
-        ) {
-            if (discoveryState is DiscoveryState.Searching) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            } else {
-                Text(stringResource(R.string.discover_devices))
-            }
-        }
-        if (discoveryState is DiscoveryState.Error) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.discovery_hint_manual_ip),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
+            Icon(
+                imageVector = Icons.Default.Router,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = userId,
-            onValueChange = { userId = it },
-            label = { Text(stringResource(R.string.user_id)) },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text(stringResource(R.string.password)) },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = {
-                val raw = ipAddress
-                val ipWithScheme = if (raw.startsWith("http://") || raw.startsWith("https://")) {
-                    raw
-                } else {
-                    (if (useHttps) "https://" else "http://") + raw
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.oasis_title),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // IP Address & Discovery
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                TextField(
+                    value = ipAddress,
+                    onValueChange = { ipAddress = it },
+                    placeholder = { Text(stringResource(R.string.ip_address)) },
+                    leadingIcon = { Icon(Icons.Default.Lan, null) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = textFieldColors,
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                OutlinedButton(
+                    onClick = onDiscoverClick,
+                    enabled = discoveryState !is DiscoveryState.Searching,
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.height(56.dp)
+                ) {
+                    if (discoveryState is DiscoveryState.Searching) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.discover_devices))
+                    }
                 }
-                onLoginClick(ipWithScheme, userId, password)
-            },
-            enabled = isLoginEnabled && loginState !is LoginState.Loading,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            if (loginState is LoginState.Loading) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            } else {
-                Text(stringResource(R.string.login))
+            }
+            
+            if (discoveryState is DiscoveryState.Error) {
+                Text(
+                    text = stringResource(R.string.discovery_hint_manual_ip),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Credentials
+            TextField(
+                value = userId,
+                onValueChange = { userId = it },
+                placeholder = { Text(stringResource(R.string.user_id)) },
+                leadingIcon = { Icon(Icons.Default.Person, null) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = textFieldColors,
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            TextField(
+                value = password,
+                onValueChange = { password = it },
+                placeholder = { Text(stringResource(R.string.password)) },
+                leadingIcon = { Icon(Icons.Default.Lock, null) },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = textFieldColors,
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.align(Alignment.Start)) {
+                Switch(checked = useHttps, onCheckedChange = { useHttps = it })
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(text = stringResource(R.string.https), style = MaterialTheme.typography.bodyMedium)
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            ElevatedButton(
+                onClick = {
+                    val raw = ipAddress
+                    val ipWithScheme = if (raw.startsWith("http://") || raw.startsWith("https://")) {
+                        raw
+                    } else {
+                        (if (useHttps) "https://" else "http://") + raw
+                    }
+                    onLoginClick(ipWithScheme, userId, password)
+                },
+                enabled = isLoginEnabled && loginState !is LoginState.Loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.elevatedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                if (loginState is LoginState.Loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(R.string.login), fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

@@ -53,6 +53,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -282,11 +284,12 @@ fun ChatScreen(viewModel: ChatViewModel) {
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text(text = title ?: stringResource(R.string.oasis_title)) },
+                    title = { Text(text = title ?: stringResource(R.string.oasis_title), style = MaterialTheme.typography.titleLarge) },
                     navigationIcon = {
                         IconButton(onClick = { openMenu = true }) {
                             Icon(Icons.Filled.Menu, contentDescription = stringResource(R.string.system_messages))
@@ -294,20 +297,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
                     },
                     actions = {
                         // Voice mode toggle (speaker)
-                        IconButton(onClick = {
+                        IconButton(onClick = { viewModel.toggleVoiceEnabled() }) {
                             if (voiceEnabled) {
-                                viewModel.setVoiceEnabled(false)
-                            } else {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                                    viewModel.setVoiceEnabled(true)
-                                } else {
-                                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                }
-                            }
-                        }) {
-                            if (voiceEnabled) {
-                                val iconColor = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = stringResource(R.string.voice_on), tint = iconColor)
+                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = stringResource(R.string.voice_on))
                             } else {
                                 Icon(Icons.AutoMirrored.Filled.VolumeOff, contentDescription = stringResource(R.string.voice_off))
                             }
@@ -347,7 +339,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 }
                 
                 if (reboot) {
-                    Surface(color = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant) {
+                    Surface(color = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -381,69 +373,67 @@ fun ChatScreen(viewModel: ChatViewModel) {
             )
         }
     ) { paddingValues ->
-        val bgBrush = Brush.verticalGradient(colors = listOf(Color(0xFFF7F7F7), Color(0xFFEDEBFF)))
-        Box(modifier = Modifier
-            .padding(paddingValues)
-            .fillMaxSize()
-            .background(bgBrush)
+        Column(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize()
         ) {
-            AudioVisualizer(isListening = isListening, rmsDbFlow = sttManager.rmsDb)
-
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Show AI service selector at the top of the chat content
-                val services by viewModel.aiServices.collectAsStateWithLifecycle()
-                val selectedServiceId by viewModel.selectedServiceId.collectAsStateWithLifecycle()
-                if (services.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AiServiceSelector(
-                            items = services,
-                            selectedId = selectedServiceId,
-                            onSelect = { viewModel.selectAiService(it) }
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-
-                // Message list area
+            // Show AI service selector at the top of the chat content
+            val services by viewModel.aiServices.collectAsStateWithLifecycle()
+            val selectedServiceId by viewModel.selectedServiceId.collectAsStateWithLifecycle()
+            if (services.isNotEmpty()) {
                 Box(
                     modifier = Modifier
-                        .weight(1f)
                         .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    MessageList(
-                        messages = viewModel.messages,
-                        modifier = Modifier.fillMaxSize(),
-                        listState = listState,
-                        sending = sending,
-                        onQuoteRequested = { quote ->
-                            val quoted = quote.lines().joinToString("\n") { "> " + it } + "\n\n"
-                            inputText = quoted
-                            viewModel.onInputTextChanged(quoted)
-                        }
+                    AiServiceSelector(
+                        items = services,
+                        selectedId = selectedServiceId,
+                        onSelect = { viewModel.selectAiService(it) }
                     )
-                    if (!atBottom && viewModel.messages.isNotEmpty()) {
-                        FloatingActionButton(
-                            onClick = {
-                                coroutineScope.launch { listState.animateScrollToItem(0) }
-                            },
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 12.dp)
-                        ) {
-                            Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.latest))
-                        }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                // Background visualizer when voice mode is enabled
+                if (voiceEnabled) {
+                    AudioVisualizer(isListening = isListening, rmsDbFlow = sttManager.rmsDb)
+                }
+
+                MessageList(
+                    messages = viewModel.messages,
+                    modifier = Modifier.fillMaxSize(),
+                    listState = listState,
+                    sending = sending,
+                    onQuoteRequested = { quote ->
+                        val quoted = quote.lines().joinToString("\n") { "> " + it } + "\n\n"
+                        inputText = quoted
+                        viewModel.onInputTextChanged(quoted)
+                    }
+                )
+                if (!atBottom && viewModel.messages.isNotEmpty()) {
+                    FloatingActionButton(
+                        onClick = {
+                            coroutineScope.launch { listState.animateScrollToItem(0) }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 12.dp)
+                    ) {
+                        Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.latest))
                     }
                 }
             }
         }
     }
+
 
     if (openSysmsgDialog) {
         SysmsgSelectDialog(
@@ -551,29 +541,29 @@ fun HistoryDialog(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageItem(message: Message, onQuoteRequested: (String) -> Unit) {
-    val bubbleColor = if (message.isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-    val textColor = if (message.isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val bubbleColor = if (message.isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
+    val textColor = if (message.isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
     val shape = if (message.isUser) {
-        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 4.dp)
+        RoundedCornerShape(topStart = 20.dp, topEnd = 4.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
     } else {
-        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 16.dp)
+        RoundedCornerShape(topStart = 4.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 20.dp)
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp, horizontal = 8.dp),
+            .padding(vertical = 6.dp, horizontal = 12.dp),
         horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start,
-        verticalAlignment = Alignment.Bottom
+        verticalAlignment = Alignment.Top
     ) {
         if (!message.isUser) {
             Icon(
                 imageVector = Icons.Filled.SmartToy,
                 contentDescription = stringResource(R.string.assistant),
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier
-                    .size(28.dp)
-                    .padding(end = 6.dp)
+                    .size(32.dp)
+                    .padding(end = 8.dp)
             )
         }
 
@@ -584,10 +574,10 @@ fun MessageItem(message: Message, onQuoteRequested: (String) -> Unit) {
             color = bubbleColor,
             contentColor = textColor,
             shape = shape,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp,
+            tonalElevation = 1.dp,
+            shadowElevation = 1.dp,
             modifier = Modifier
-                .widthIn(max = LocalConfiguration.current.screenWidthDp.dp * 0.75f)
+                .widthIn(max = LocalConfiguration.current.screenWidthDp.dp * 0.8f)
                 .combinedClickable(
                     onClick = {},
                     onLongClick = { showMenu = true }
@@ -628,8 +618,8 @@ fun MessageItem(message: Message, onQuoteRequested: (String) -> Unit) {
                 contentDescription = stringResource(R.string.user),
                 tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier
-                    .size(28.dp)
-                    .padding(start = 6.dp)
+                    .size(32.dp)
+                    .padding(start = 8.dp)
             )
         }
     }
@@ -642,30 +632,42 @@ fun MessageInput(
     onSendClick: () -> Unit,
     enabled: Boolean
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-            .imePadding(),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 2.dp
     ) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.weight(1f),
-            placeholder = { Text(stringResource(R.string.enter_message)) },
-            singleLine = true,
-            shape = RoundedCornerShape(24.dp),
-            trailingIcon = {
-                IconButton(onClick = onSendClick, enabled = enabled) {
-                    if (!enabled && value.isNotBlank()) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .imePadding(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text(stringResource(R.string.enter_message)) },
+                singleLine = true,
+                shape = RoundedCornerShape(24.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                trailingIcon = {
+                    IconButton(onClick = onSendClick, enabled = enabled) {
+                        if (!enabled && value.isNotBlank()) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send), tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
-            }
-        )
+            )
+        }
     }
 }
 
