@@ -52,8 +52,13 @@ fun ChatScreen(viewModel: ChatViewModel) {
         derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
     }
     LaunchedEffect(viewModel.messages.size) {
-        if (atBottom && viewModel.messages.isNotEmpty()) {
-            listState.scrollToItem(0)
+        if (viewModel.messages.isNotEmpty()) {
+            val isUserAtBottom = listState.firstVisibleItemIndex < 2
+            val isAiResponse = !viewModel.messages.last().isUser
+            
+            if (isUserAtBottom || isAiResponse) {
+                listState.animateScrollToItem(0)
+            }
         }
     }
 
