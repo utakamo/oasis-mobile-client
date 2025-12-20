@@ -54,6 +54,12 @@ import com.example.oasis_mobile_client.MarkdownParser
 import com.example.oasis_mobile_client.Message
 import com.example.oasis_mobile_client.R
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+
 @Suppress("DEPRECATION")
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -74,13 +80,14 @@ fun MessageItem(message: Message, onQuoteRequested: (String) -> Unit) {
         verticalAlignment = Alignment.Top
     ) {
         if (!message.isUser) {
-            Icon(
-                imageVector = Icons.Filled.SmartToy,
+            Image(
+                painter = painterResource(id = R.drawable.openwrt),
                 contentDescription = stringResource(R.string.assistant),
-                tint = MaterialTheme.colorScheme.secondary,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(32.dp)
                     .padding(end = 8.dp)
+                    .clip(CircleShape)
             )
         }
 
