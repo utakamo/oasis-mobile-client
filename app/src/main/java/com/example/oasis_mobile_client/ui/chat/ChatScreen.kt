@@ -45,6 +45,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val voiceEnabled by viewModel.voiceEnabled.collectAsStateWithLifecycle()
     val speechRate by viewModel.speechRate.collectAsStateWithLifecycle()
     val speechPitch by viewModel.speechPitch.collectAsStateWithLifecycle()
+    val sessionExpired by viewModel.sessionExpired.collectAsStateWithLifecycle()
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -365,6 +366,24 @@ fun ChatScreen(viewModel: ChatViewModel) {
             loading = loading,
             onToggle = { name, enabled -> viewModel.setToolEnabled(name, enabled) },
             onDismiss = { openToolsDialog = false }
+        )
+    }
+
+    if (sessionExpired) {
+        AlertDialog(
+            onDismissRequest = { /* Force user to choose */ },
+            title = { Text("Session Expired") },
+            text = { Text("The connection to the server has expired. Do you want to reconnect?") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.reconnect() }) {
+                    Text("Reconnect")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.logout() }) {
+                    Text("Logout")
+                }
+            }
         )
     }
 }

@@ -152,6 +152,32 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
     private val _rebootBanner = MutableStateFlow(false)
     val rebootBanner = _rebootBanner.asStateFlow()
 
+    private val _sessionExpired = MutableStateFlow(false)
+    val sessionExpired = _sessionExpired.asStateFlow()
+
+    private fun handleApiError(e: Throwable) {
+        val msg = e.message ?: ""
+        if (msg.contains("Access Denied", ignoreCase = true) || 
+            msg.contains("Session expired", ignoreCase = true) ||
+            msg.contains("code=6", ignoreCase = true)) {
+            _sessionExpired.value = true
+        } else {
+            _lastError.value = msg
+        }
+    }
+
+    fun reconnect() {
+        _sessionExpired.value = false
+        val ip = lastIpAddress
+        val user = lastUsername
+        val pass = lastPassword
+        if (!ip.isNullOrBlank() && !user.isNullOrBlank() && !pass.isNullOrBlank()) {
+            login(ip, user, pass)
+        } else {
+            logout()
+        }
+    }
+
     // Text-to-Speech mode
     private val _voiceEnabled = MutableStateFlow(false)
     val voiceEnabled = _voiceEnabled.asStateFlow()
@@ -205,7 +231,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                     _tools.value = list.map { ToolItem(it.name, it.server, it.enabled) }
                 }
                 .onFailure { e ->
-                    _lastError.value = "ツール一覧の取得に失敗しました: ${e.message}"
+                    handleApiError(e)
                 }
             _toolsLoading.value = false
         }
@@ -223,7 +249,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 .onFailure { e ->
                     // Roll back on failure
                     _tools.value = _tools.value.map { if (it.name == name) it.copy(enabled = !enabled) else it }
-                    _lastError.value = "ツールの更新に失敗しました: ${e.message}"
+                    handleApiError(e)
                 }
         }
     }
@@ -262,7 +288,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                     _history.value = items.map { ChatSummary(it.id, it.title) }
                 }
                 .onFailure { e ->
-                    _lastError.value = "履歴の取得に失敗しました: ${e.message}"
+                    handleApiError(e)
                 }
         }
     }
@@ -339,7 +365,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 return@launch
             }
             runCatching { repository.selectAiService(currentSessionId, item.id, item.name, item.model) }
-                .onFailure { e -> _lastError.value = "AIサービスの切替に失敗しました: ${e.message}" }
+                .onFailure { e -> handleApiError(e) }
         }
     }
 
@@ -416,7 +442,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 val msg = getApplication<Application>().getString(R.string.send_failed, e.message ?: "")
                 Log.e(TAG, "sendMessage failed", e)
                 messages.add(Message(msg, false))
-                _lastError.value = msg
+                handleApiError(e) // Use handleApiError
             } finally {
                 _sending.value = false
             }
@@ -454,7 +480,10 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 refreshHistory()
             } catch (e: Exception) {
                 Log.e(TAG, "retryLastFailed failed", e)
-                _lastError.value = getApplication<Application>().getString(R.string.retry_failed, e.message ?: "")
+                // _lastError.value = ... // ここも handleApiError にすべきか？
+                // retryLastFailed は sendMessage と同じロジックを繰り返しているので、本来は共通化すべきですが、
+                // 今回はシンプルにここでも handleApiError を呼ぶようにします。
+                handleApiError(e)
             } finally {
                 _sending.value = false
             }
@@ -477,7 +506,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 if (!title.isNullOrBlank()) _chatTitle.value = title
             } catch (e: Exception) {
                 Log.e(TAG, "loadChatById failed", e)
-                _lastError.value = getApplication<Application>().getString(R.string.history_load_failed, e.message ?: "")
+                handleApiError(e)
             }
         }
     }
