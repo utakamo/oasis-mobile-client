@@ -115,6 +115,11 @@ fun MessageItem(message: Message, onQuoteRequested: (String) -> Unit) {
                 androidx.compose.foundation.text.selection.SelectionContainer {
                     if (message.text.startsWith("UCI提案")) {
                         UciBlock(text = message.text)
+                    } else if (message.text == "…") {
+                        TypingIndicator(
+                            dotColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+                        )
                     } else {
                         if (message.isUser) {
                             Text(text = message.text)

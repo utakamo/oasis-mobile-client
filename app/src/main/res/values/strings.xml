@@ -50,4 +50,7 @@
     <string name="history_load_failed">Failed to load history: %1$s</string>
     <string name="connection_failed">Connection failed: %1$s</string>
     <string name="reconfigure">Re-configure</string>
+    <string name="copy_done">Copied</string>
+    <string name="copy_button">Copy</string>
+    <string name="uci_proposal_prefix">UCI Proposal</string>
 </resources>
