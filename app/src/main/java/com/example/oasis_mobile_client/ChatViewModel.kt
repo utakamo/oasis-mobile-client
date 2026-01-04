@@ -216,11 +216,63 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     // ---- Tools ----
-    data class ToolItem(val name: String, val server: String, val enabled: Boolean)
+    data class ToolItem(
+        val name: String,
+        val server: String,
+        val enabled: Boolean,
+        val properties: List<String> = emptyList(),
+        val required: List<String> = emptyList()
+    )
     private val _tools = MutableStateFlow<List<ToolItem>>(emptyList())
     val tools = _tools.asStateFlow()
     private val _toolsLoading = MutableStateFlow(false)
     val toolsLoading = _toolsLoading.asStateFlow()
+    
+    private val _functionCallingResult = MutableStateFlow<String?>(null)
+    val functionCallingResult = _functionCallingResult.asStateFlow()
+
+    fun clearFunctionCallingResult() {
+        _functionCallingResult.value = null
+    }
+
+    fun executeFunctionCalling(toolName: String, inputParams: Map<String, String>) {
+        val sid = sessionId ?: return
+        val tool = _tools.value.firstOrNull { it.name == toolName } ?: return
+        
+        viewModelScope.launch {
+            try {
+                // Construct the 'param' string: "name:type:value"
+                // If multiple params, how to join? Assuming single param for now based on description,
+                // or comma separated if multiple? The prompt says: "argument is '<var>:<type>:<value>'".
+                // We will construct a list of these strings.
+                // Note: The repository `executeFunctionCalling` expects a single String for `param`.
+                // If there are multiple properties, we might need to send them one by one or join them.
+                // Based on standard ubus/CLI usage, it might be JSON or a specific format.
+                // For this implementation, we'll try to find the matching property definition for each input
+                // and construct the string. If multiple, we might only support one for now or join with space/comma.
+                // Let's assume we join with spaces for now if multiple, but most tools seem to have 0 or 1 param.
+                
+                val paramStrings = inputParams.mapNotNull { (key, value) ->
+                    // Find definition: "key:type:desc"
+                    val def = tool.properties.find { it.startsWith("$key:") }
+                    if (def != null) {
+                        val parts = def.split(":")
+                        if (parts.size >= 2) {
+                            val type = parts[1]
+                            "$key:$type:$value"
+                        } else null
+                    } else null
+                }
+                
+                val paramString = paramStrings.joinToString(" ") // Tentative joining
+                
+                val result = repository.executeFunctionCalling(sid, toolName, paramString)
+                _functionCallingResult.value = result
+            } catch (e: Exception) {
+                _functionCallingResult.value = "Error: ${e.message}"
+            }
+        }
+    }
 
     fun refreshTools() {
         val sid = sessionId ?: return
@@ -228,10 +280,10 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
             _toolsLoading.value = true
             runCatching { repository.getToolList(sid) }
                 .onSuccess { list ->
-                    _tools.value = list.map { ToolItem(it.name, it.server, it.enabled) }
+                    _tools.value = list.map { ToolItem(it.name, it.server, it.enabled, it.properties, it.required) }
                 }
                 .onFailure { e ->
-                    handleApiError(e)
+                    _lastError.value = "ツール一覧の取得に失敗しました: ${e.message}"
                 }
             _toolsLoading.value = false
         }

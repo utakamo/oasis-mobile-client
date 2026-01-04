@@ -46,6 +46,7 @@ class OasisRepository(private val context: Context) {
         private const val UBUS_OBJECT_OASIS_TOOL_LIST = "oasis.tool.edge"
         private const val UBUS_OBJECT_OASIS_TOOL_MANAGER = "oasis.tool.manager"
         private const val UBUS_METHOD_TOOL_LIST = "tool_list"
+        private const val UBUS_METHOD_FUNCTION_CALLING = "function_calling"
         private const val UBUS_METHOD_SET_TOOL_ENABLED = "set_tool_enabled"
         private const val UBUS_METHOD_SET_TOOL_DISABLED = "set_tool_disabled"
         private val NSD_SERVICE_TYPES = listOf(
@@ -186,7 +187,13 @@ class OasisRepository(private val context: Context) {
 
     @SuppressLint("UnsafeOptInUsageError")
     @kotlinx.serialization.Serializable
-    data class ToolInfo(val name: String, val server: String, val enabled: Boolean)
+    data class ToolInfo(
+        val name: String,
+        val server: String,
+        val enabled: Boolean,
+        val properties: List<String> = emptyList(),
+        val required: List<String> = emptyList()
+    )
 
     suspend fun getToolList(sessionId: String): List<ToolInfo> {
         val requestParams = buildJsonArray {
@@ -205,9 +212,30 @@ class OasisRepository(private val context: Context) {
                 val server = o["server"]?.jsonPrimitive?.content ?: ""
                 val enableStr = o["enable"]?.jsonPrimitive?.content ?: "0"
                 val enabled = (enableStr == "1" || enableStr.equals("true", ignoreCase = true))
-                list.add(ToolInfo(name, server, enabled))
+                
+                val properties = o["property"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+                val required = o["required"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+
+                list.add(ToolInfo(name, server, enabled, properties, required))
             }
             list
+        }
+    }
+
+    suspend fun executeFunctionCalling(sessionId: String, toolName: String, param: String): String {
+        val requestParams = buildJsonArray {
+            add(sessionId)
+            add(UBUS_OBJECT_OASIS_TOOL_LIST) // Same object as tool_list
+            add(UBUS_METHOD_FUNCTION_CALLING)
+            add(buildJsonObject {
+                put("tool", toolName)
+                put("param", param)
+            })
+        }
+        val request = JsonRpcRequest(method = JsonRpcRequest.METHOD_CALL, params = requestParams)
+        // Returns the raw JSON result as a string
+        return makeRpcCall(request) { result ->
+            result[1].toString()
         }
     }
 

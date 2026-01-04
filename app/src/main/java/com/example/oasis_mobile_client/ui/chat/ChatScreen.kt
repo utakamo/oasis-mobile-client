@@ -156,6 +156,7 @@ fun ChatScreen(viewModel: ChatViewModel) {
     var openHistoryDialog by remember { mutableStateOf(false) }
     var openSettingsDialog by remember { mutableStateOf(false) }
     var openToolsDialog by remember { mutableStateOf(false) }
+    var openFunctionCallingDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(openHistoryDialog) {
         if (openHistoryDialog) {
@@ -166,6 +167,13 @@ fun ChatScreen(viewModel: ChatViewModel) {
     LaunchedEffect(openToolsDialog) {
         if (openToolsDialog) {
             viewModel.refreshTools()
+        }
+    }
+    
+    LaunchedEffect(openFunctionCallingDialog) {
+        if (openFunctionCallingDialog) {
+            viewModel.refreshTools() // Ensure we have the latest tool definitions
+            viewModel.clearFunctionCallingResult()
         }
     }
 
@@ -213,6 +221,13 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         onClick = {
                             openMenu = false
                             openToolsDialog = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Function Calling") },
+                        onClick = {
+                            openMenu = false
+                            openFunctionCallingDialog = true
                         }
                     )
                     DropdownMenuItem(
@@ -366,6 +381,18 @@ fun ChatScreen(viewModel: ChatViewModel) {
             loading = loading,
             onToggle = { name, enabled -> viewModel.setToolEnabled(name, enabled) },
             onDismiss = { openToolsDialog = false }
+        )
+    }
+
+    if (openFunctionCallingDialog) {
+        val items by viewModel.tools.collectAsStateWithLifecycle()
+        val result by viewModel.functionCallingResult.collectAsStateWithLifecycle()
+        
+        FunctionCallingDialog(
+            tools = items,
+            onExecute = { name, params -> viewModel.executeFunctionCalling(name, params) },
+            onDismiss = { openFunctionCallingDialog = false },
+            result = result
         )
     }
 
