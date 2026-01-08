@@ -54,7 +54,7 @@ fun FunctionCallingDialog(
                             expanded = expanded,
                             onDismissRequest = { expanded = false }
                         ) {
-                            tools.forEach { tool ->
+                            tools.filter { it.enabled }.forEach { tool ->
                                 DropdownMenuItem(
                                     text = { Text(tool.name) },
                                     onClick = {
