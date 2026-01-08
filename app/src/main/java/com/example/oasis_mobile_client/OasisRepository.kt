@@ -49,6 +49,8 @@ class OasisRepository(private val context: Context) {
         private const val UBUS_METHOD_FUNCTION_CALLING = "function_calling"
         private const val UBUS_METHOD_SET_TOOL_ENABLED = "set_tool_enabled"
         private const val UBUS_METHOD_SET_TOOL_DISABLED = "set_tool_disabled"
+        private const val UBUS_OBJECT_OASIS_SERVICE = "oasis.service"
+        private const val UBUS_METHOD_OPERATE = "operate"
         private val NSD_SERVICE_TYPES = listOf(
             "_oasis._tcp.",
             "_oasis-jsonrpc._tcp.",
@@ -236,6 +238,23 @@ class OasisRepository(private val context: Context) {
         // Returns the raw JSON result as a string
         return makeRpcCall(request) { result ->
             result[1].toString()
+        }
+    }
+
+    suspend fun operateService(sessionId: String, serviceName: String, cmd: String): String {
+        val requestParams = buildJsonArray {
+            add(sessionId)
+            add(UBUS_OBJECT_OASIS_SERVICE)
+            add(UBUS_METHOD_OPERATE)
+            add(buildJsonObject {
+                put("cmd", cmd)
+                put("service", serviceName)
+            })
+        }
+        val request = JsonRpcRequest(method = JsonRpcRequest.METHOD_CALL, params = requestParams)
+        // Returns the raw JSON result as a string (or empty if void)
+        return makeRpcCall(request) { result ->
+            result.getOrNull(1)?.toString() ?: ""
         }
     }
 

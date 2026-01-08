@@ -46,6 +46,8 @@ fun ChatScreen(viewModel: ChatViewModel) {
     val speechRate by viewModel.speechRate.collectAsStateWithLifecycle()
     val speechPitch by viewModel.speechPitch.collectAsStateWithLifecycle()
     val sessionExpired by viewModel.sessionExpired.collectAsStateWithLifecycle()
+    val restartServiceTarget by viewModel.restartServiceTarget.collectAsStateWithLifecycle()
+    val shutdownConfirmation by viewModel.shutdownConfirmation.collectAsStateWithLifecycle()
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -393,6 +395,42 @@ fun ChatScreen(viewModel: ChatViewModel) {
             onExecute = { name, params -> viewModel.executeFunctionCalling(name, params) },
             onDismiss = { openFunctionCallingDialog = false },
             result = result
+        )
+    }
+
+    restartServiceTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissRestartDialog() },
+            title = { Text(text = "Restart Service") },
+            text = { Text(text = "Do you want to restart the service '$target'?") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.restartService() }) {
+                    Text(text = stringResource(R.string.ok)) // Using generic OK string or add "Yes"
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissRestartDialog() }) {
+                    Text(text = stringResource(R.string.close)) // Using generic Close or add "No"
+                }
+            }
+        )
+    }
+
+    if (shutdownConfirmation) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissShutdownDialog() },
+            title = { Text(text = "System Shutdown") },
+            text = { Text(text = "Do you want to shutdown the system?") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.shutdownSystem() }) {
+                    Text(text = stringResource(R.string.ok))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissShutdownDialog() }) {
+                    Text(text = stringResource(R.string.close))
+                }
+            }
         )
     }
 

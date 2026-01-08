@@ -231,8 +231,90 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
     private val _functionCallingResult = MutableStateFlow<String?>(null)
     val functionCallingResult = _functionCallingResult.asStateFlow()
 
+    private val _restartServiceTarget = MutableStateFlow<String?>(null)
+    val restartServiceTarget = _restartServiceTarget.asStateFlow()
+
+    private val _shutdownConfirmation = MutableStateFlow(false)
+    val shutdownConfirmation = _shutdownConfirmation.asStateFlow()
+
     fun clearFunctionCallingResult() {
         _functionCallingResult.value = null
+    }
+
+    fun dismissRestartDialog() {
+        _restartServiceTarget.value = null
+    }
+
+    fun dismissShutdownDialog() {
+        _shutdownConfirmation.value = false
+    }
+
+    fun restartService() {
+        val target = _restartServiceTarget.value ?: return
+        val sid = sessionId ?: return
+        viewModelScope.launch {
+            runCatching { repository.operateService(sid, target, "restart") }
+                .onSuccess {
+                    Log.d(TAG, "Service $target restarted successfully")
+                    // Optionally show a message to the user?
+                    // For now, just dismiss the dialog
+                    _restartServiceTarget.value = null
+                }
+                .onFailure { e ->
+                    Log.e(TAG, "Failed to restart service $target", e)
+                    _lastError.value = "Failed to restart service $target: ${e.message}"
+                    _restartServiceTarget.value = null
+                }
+        }
+    }
+
+    fun shutdownSystem() {
+        viewModelScope.launch {
+            Log.d(TAG, "Mock: Shutting down system")
+            // TODO: Implement actual system shutdown API call here
+            _shutdownConfirmation.value = false
+        }
+    }
+
+    private fun checkToolResultForActions(element: JsonElement?) {
+        if (element == null) return
+        // Log.d(TAG, "checkToolResultForActions: $element") // Uncomment for verbose logging
+        
+        fun checkObject(obj: kotlinx.serialization.json.JsonObject) {
+            val target = obj["prepare_service_restart"]?.jsonPrimitive?.content
+            if (!target.isNullOrBlank()) {
+                Log.d(TAG, "Found prepare_service_restart: $target")
+                _restartServiceTarget.value = target
+            }
+            val shutdown = obj["shutdown"]?.jsonPrimitive?.booleanOrNull ?: false
+            if (shutdown) {
+                Log.d(TAG, "Found shutdown: true")
+                _shutdownConfirmation.value = true
+            }
+            // Also check inside tool_outputs if present
+            obj["tool_outputs"]?.jsonArray?.forEach { checkToolResultForActions(it) }
+            obj["tools"]?.jsonArray?.forEach { checkToolResultForActions(it) }
+        }
+
+        runCatching {
+            when (element) {
+                is kotlinx.serialization.json.JsonObject -> checkObject(element)
+                is kotlinx.serialization.json.JsonArray -> element.forEach { checkToolResultForActions(it) }
+                is kotlinx.serialization.json.JsonPrimitive -> {
+                    if (element.isString) {
+                        // Sometimes the tool output is a stringified JSON inside a string
+                        val parsed = try {
+                             Json.parseToJsonElement(element.content)
+                        } catch (e: Exception) {
+                             null
+                        }
+                        if (parsed != null) {
+                            checkToolResultForActions(parsed)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun executeFunctionCalling(toolName: String, inputParams: Map<String, String>) {
@@ -241,19 +323,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
         
         viewModelScope.launch {
             try {
-                // Construct the 'param' string: "name:type:value"
-                // If multiple params, how to join? Assuming single param for now based on description,
-                // or comma separated if multiple? The prompt says: "argument is '<var>:<type>:<value>'".
-                // We will construct a list of these strings.
-                // Note: The repository `executeFunctionCalling` expects a single String for `param`.
-                // If there are multiple properties, we might need to send them one by one or join them.
-                // Based on standard ubus/CLI usage, it might be JSON or a specific format.
-                // For this implementation, we'll try to find the matching property definition for each input
-                // and construct the string. If multiple, we might only support one for now or join with space/comma.
-                // Let's assume we join with spaces for now if multiple, but most tools seem to have 0 or 1 param.
-                
                 val paramStrings = inputParams.mapNotNull { (key, value) ->
-                    // Find definition: "key:type:desc"
                     val def = tool.properties.find { it.startsWith("$key:") }
                     if (def != null) {
                         val parts = def.split(":")
@@ -264,11 +334,19 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                     } else null
                 }
                 
-                val paramString = paramStrings.joinToString(" ") // Tentative joining
+                val paramString = paramStrings.joinToString(" ")
                 
-                val result = repository.executeFunctionCalling(sid, toolName, paramString)
-                _functionCallingResult.value = result
+                val resultString = repository.executeFunctionCalling(sid, toolName, paramString)
+                Log.d(TAG, "executeFunctionCalling result: $resultString")
+                _functionCallingResult.value = resultString
+
+                // Check for actions in the result
+                runCatching {
+                    val jsonElement = Json.parseToJsonElement(resultString)
+                    checkToolResultForActions(jsonElement)
+                }
             } catch (e: Exception) {
+                Log.e(TAG, "executeFunctionCalling failed", e)
                 _functionCallingResult.value = "Error: ${e.message}"
             }
         }
@@ -455,6 +533,8 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                         text = ""
                     }
                     messages.add(Message(text, false, toolUsed = (label != null), toolLabel = label))
+                    // Check for actions triggered by AI tool execution
+                    checkToolResultForActions(result.toolInfo)
                 }
                 OasisJsonParser.formatUciProposal(result.uciParseTbl)?.let { messages.add(Message(it, false)) }
                 if (result.reboot == true) { _rebootBanner.value = true }
@@ -481,6 +561,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                                 text = ""
                             }
                             messages.add(Message(text, false, toolUsed = (label != null), toolLabel = label))
+                            checkToolResultForActions(retry.toolInfo)
                         }
                         OasisJsonParser.formatUciProposal(retry.uciParseTbl)?.let { messages.add(Message(it, false)) }
                         if (retry.reboot == true) { _rebootBanner.value = true }
@@ -525,6 +606,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                         text = ""
                     }
                     messages.add(Message(text, false, toolUsed = (label != null), toolLabel = label))
+                    checkToolResultForActions(result.toolInfo)
                 }
                 OasisJsonParser.formatUciProposal(result.uciParseTbl)?.let { messages.add(Message(it, false)) }
                 if (result.reboot == true) { _rebootBanner.value = true }
@@ -532,9 +614,6 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 refreshHistory()
             } catch (e: Exception) {
                 Log.e(TAG, "retryLastFailed failed", e)
-                // _lastError.value = ... // ここも handleApiError にすべきか？
-                // retryLastFailed は sendMessage と同じロジックを繰り返しているので、本来は共通化すべきですが、
-                // 今回はシンプルにここでも handleApiError を呼ぶようにします。
                 handleApiError(e)
             } finally {
                 _sending.value = false
