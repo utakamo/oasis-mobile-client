@@ -51,6 +51,8 @@ class OasisRepository(private val context: Context) {
         private const val UBUS_METHOD_SET_TOOL_DISABLED = "set_tool_disabled"
         private const val UBUS_OBJECT_OASIS_SERVICE = "oasis.service"
         private const val UBUS_METHOD_OPERATE = "operate"
+        private const val UBUS_OBJECT_OASIS_SYSTEM = "oasis.system"
+        private const val UBUS_METHOD_CONFIRM = "confirm"
         private val NSD_SERVICE_TYPES = listOf(
             "_oasis._tcp.",
             "_oasis-jsonrpc._tcp.",
@@ -253,6 +255,21 @@ class OasisRepository(private val context: Context) {
         }
         val request = JsonRpcRequest(method = JsonRpcRequest.METHOD_CALL, params = requestParams)
         // Returns the raw JSON result as a string (or empty if void)
+        return makeRpcCall(request) { result ->
+            result.getOrNull(1)?.toString() ?: ""
+        }
+    }
+
+    suspend fun confirmSystemAction(sessionId: String, option: String): String {
+        val requestParams = buildJsonArray {
+            add(sessionId)
+            add(UBUS_OBJECT_OASIS_SYSTEM)
+            add(UBUS_METHOD_CONFIRM)
+            add(buildJsonObject {
+                put("option", option)
+            })
+        }
+        val request = JsonRpcRequest(method = JsonRpcRequest.METHOD_CALL, params = requestParams)
         return makeRpcCall(request) { result ->
             result.getOrNull(1)?.toString() ?: ""
         }

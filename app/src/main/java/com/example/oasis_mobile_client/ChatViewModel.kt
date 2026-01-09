@@ -269,10 +269,18 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun shutdownSystem() {
+        val sid = sessionId ?: return
         viewModelScope.launch {
-            Log.d(TAG, "Mock: Shutting down system")
-            // TODO: Implement actual system shutdown API call here
-            _shutdownConfirmation.value = false
+            runCatching { repository.confirmSystemAction(sid, "shutdown") }
+                .onSuccess {
+                    Log.d(TAG, "Shutdown command sent successfully")
+                    _shutdownConfirmation.value = false
+                }
+                .onFailure { e ->
+                    Log.e(TAG, "Failed to shutdown system", e)
+                    _lastError.value = "Failed to shutdown system: ${e.message}"
+                    _shutdownConfirmation.value = false
+                }
         }
     }
 
