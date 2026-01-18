@@ -53,4 +53,11 @@
     <string name="copy_done">Copied</string>
     <string name="copy_button">Copy</string>
     <string name="uci_proposal_prefix">UCI Proposal</string>
+
+    <!-- User Friendly Errors -->
+    <string name="error_network_connection">Could not connect to the server. Please check your IP address and network connection.</string>
+    <string name="error_timeout">The request timed out. Please try again.</string>
+    <string name="error_auth">Authentication failed. Please check your credentials.</string>
+    <string name="error_access_denied">Access denied. You do not have permission.</string>
+    <string name="error_unknown">An unexpected error occurred: %1$s</string>
 </resources>

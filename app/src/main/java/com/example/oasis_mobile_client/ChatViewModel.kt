@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import androidx.core.content.edit
+import com.example.oasis_mobile_client.util.ErrorMessageMapper
 
 sealed class LoginState {
     object Idle : LoginState()
@@ -162,7 +163,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
             msg.contains("code=6", ignoreCase = true)) {
             _sessionExpired.value = true
         } else {
-            _lastError.value = msg
+            _lastError.value = ErrorMessageMapper.getMessage(getApplication(), e)
         }
     }
 
@@ -262,7 +263,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 .onFailure { e ->
                     Log.e(TAG, "Failed to restart service $target", e)
-                    _lastError.value = "Failed to restart service $target: ${e.message}"
+                    handleApiError(e)
                     _restartServiceTarget.value = null
                 }
         }
@@ -278,7 +279,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 .onFailure { e ->
                     Log.e(TAG, "Failed to shutdown system", e)
-                    _lastError.value = "Failed to shutdown system: ${e.message}"
+                    handleApiError(e)
                     _shutdownConfirmation.value = false
                 }
         }
@@ -355,7 +356,8 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "executeFunctionCalling failed", e)
-                _functionCallingResult.value = "Error: ${e.message}"
+                val msg = ErrorMessageMapper.getMessage(getApplication(), e)
+                _functionCallingResult.value = "Error: $msg"
             }
         }
     }
@@ -369,7 +371,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                     _tools.value = list.map { ToolItem(it.name, it.server, it.enabled, it.properties, it.required) }
                 }
                 .onFailure { e ->
-                    _lastError.value = "ツール一覧の取得に失敗しました: ${e.message}"
+                    handleApiError(e)
                 }
             _toolsLoading.value = false
         }
@@ -403,7 +405,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                     _discoveryState.value = DiscoveryState.Error(getApplication<Application>().getString(R.string.no_devices_found))
                 }
             } catch (e: Exception) {
-                val msg = getApplication<Application>().getString(R.string.discovery_failed, e.message ?: "")
+                val msg = ErrorMessageMapper.getMessage(getApplication(), e)
                 Log.e(TAG, "discoverOasisDevices failed", e)
                 _discoveryState.value = DiscoveryState.Error(msg)
             }
@@ -474,7 +476,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                 saveCredentials(ipAddress, username, password)
                 _loginState.value = LoginState.Success
             } catch (e: Exception) {
-                val msg = getApplication<Application>().getString(R.string.connection_failed, e.message ?: "")
+                val msg = ErrorMessageMapper.getMessage(getApplication(), e)
                 Log.e(TAG, "login failed", e)
                 // messages.add(Message(msg, isUser = false)) // Don't add login error to chat history
                 _loginState.value = LoginState.Error(msg)
@@ -580,10 +582,11 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
                     // fallthrough to error message below
                 }
                 lastFailedMessage = capturedInput
-                val msg = getApplication<Application>().getString(R.string.send_failed, e.message ?: "")
+                val mappedMsg = ErrorMessageMapper.getMessage(getApplication(), e)
+                val msg = getApplication<Application>().getString(R.string.send_failed, mappedMsg)
                 Log.e(TAG, "sendMessage failed", e)
                 messages.add(Message(msg, false))
-                handleApiError(e) // Use handleApiError
+                handleApiError(e)
             } finally {
                 _sending.value = false
             }
