@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Menu
@@ -192,12 +194,12 @@ fun ChatScreen(viewModel: ChatViewModel) {
                         }
                     },
                     actions = {
-                        // Voice mode toggle (speaker)
+                        // Voice mode toggle (microphone)
                         IconButton(onClick = { viewModel.toggleVoiceEnabled() }) {
                             if (voiceEnabled) {
-                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = stringResource(R.string.voice_on))
+                                Icon(Icons.Filled.Mic, contentDescription = stringResource(R.string.voice_on))
                             } else {
-                                Icon(Icons.AutoMirrored.Filled.VolumeOff, contentDescription = stringResource(R.string.voice_off))
+                                Icon(Icons.Filled.MicOff, contentDescription = stringResource(R.string.voice_off))
                             }
                         }
                         // New chat
