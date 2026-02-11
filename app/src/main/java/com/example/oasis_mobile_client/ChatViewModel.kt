@@ -669,6 +669,22 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun renameChat(id: String, newTitle: String) {
+        val currentSessionId = sessionId ?: return
+        viewModelScope.launch {
+            runCatching { repository.renameChat(currentSessionId, id, newTitle) }
+                .onSuccess { actualTitle ->
+                    if (chatId == id) {
+                        _chatTitle.value = actualTitle
+                    }
+                    refreshHistory()
+                }
+                .onFailure { e ->
+                    handleApiError(e)
+                }
+        }
+    }
+
     fun dismissRebootBanner() {
         _rebootBanner.value = false
     }

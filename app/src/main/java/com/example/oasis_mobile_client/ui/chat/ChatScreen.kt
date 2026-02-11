@@ -360,6 +360,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
             onDelete = { id ->
                 viewModel.deleteChat(id)
             },
+            onRename = { id, newTitle ->
+                viewModel.renameChat(id, newTitle)
+            },
             onDismiss = { openHistoryDialog = false }
         )
     }

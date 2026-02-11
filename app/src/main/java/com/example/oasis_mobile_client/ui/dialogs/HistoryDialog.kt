@@ -7,8 +7,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -22,8 +23,12 @@ fun HistoryDialog(
     items: List<ChatViewModel.ChatSummary>,
     onSelect: (String, String?) -> Unit,
     onDelete: (String) -> Unit,
+    onRename: (String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var editingChat by remember { mutableStateOf<ChatViewModel.ChatSummary?>(null) }
+    var newTitle by remember { mutableStateOf("") }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(12.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -44,6 +49,16 @@ fun HistoryDialog(
                                     .clickable { onSelect(s.id, s.title) }
                                     .padding(vertical = 8.dp)
                             )
+                            IconButton(onClick = { 
+                                editingChat = s
+                                newTitle = s.title
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Rename",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                             IconButton(onClick = { onDelete(s.id) }) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
@@ -60,5 +75,34 @@ fun HistoryDialog(
                 }
             }
         }
+    }
+
+    // Rename Dialog
+    editingChat?.let { chat ->
+        AlertDialog(
+            onDismissRequest = { editingChat = null },
+            title = { Text("Rename Chat") },
+            text = {
+                TextField(
+                    value = newTitle,
+                    onValueChange = { newTitle = it },
+                    label = { Text("New Title") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRename(chat.id, newTitle)
+                    editingChat = null
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingChat = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

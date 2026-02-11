@@ -475,4 +475,20 @@ class OasisRepository(private val context: Context) {
         val request = JsonRpcRequest(method = JsonRpcRequest.METHOD_CALL, params = requestParams)
         makeRpcCall(request) { _ -> Unit }
     }
+
+    suspend fun renameChat(sessionId: String, chatId: String, newTitle: String): String {
+        val requestParams = buildJsonArray {
+            add(sessionId)
+            add("oasis.title")
+            add("manual_set")
+            add(buildJsonObject {
+                put("id", chatId)
+                put("title", newTitle)
+            })
+        }
+        val request = JsonRpcRequest(method = JsonRpcRequest.METHOD_CALL, params = requestParams)
+        return makeRpcCall(request) { result ->
+            result[1].jsonObject["title"]?.jsonPrimitive?.content ?: newTitle
+        }
+    }
 }
