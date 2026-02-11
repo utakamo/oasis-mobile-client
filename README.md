@@ -6,7 +6,7 @@ under development
 > As such, the system is not yet suitable for everyday use by end users. It remains an experimental platform.
 
 # 1. Connection Configuration Diagram
-<img width="437" height="157" alt="image" src="https://github.com/user-attachments/assets/bbb60c4e-b117-4835-b389-593da6d2d610" />
+<img width="2705" height="905" alt="oasis-mobile-client_connection" src="https://github.com/user-attachments/assets/567b5631-9505-4523-883b-605c93ac626c" />
 
 # 2. OASIS SETUP
 ## 2-1. AI Service
