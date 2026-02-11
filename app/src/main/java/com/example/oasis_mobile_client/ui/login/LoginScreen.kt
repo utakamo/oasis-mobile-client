@@ -186,11 +186,11 @@ fun LoginScreen(
 
             ElevatedButton(
                 onClick = {
-                    val raw = ipAddress
-                    val ipWithScheme = if (raw.startsWith("http://") || raw.startsWith("https://")) {
-                        raw
-                    } else {
-                        (if (useHttps) "https://" else "http://") + raw
+                    val raw = ipAddress.trim()
+                    val ipWithScheme = when {
+                        raw.startsWith("http://") || raw.startsWith("https://") -> raw
+                        useHttps -> "https://$raw"
+                        else -> "http://$raw"
                     }
                     onLoginClick(ipWithScheme, userId, password)
                 },

@@ -445,8 +445,7 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
             _loginState.value = LoginState.Loading
             try {
                 val raw = ipAddress.trim()
-                val withScheme = if (raw.startsWith("http://") || raw.startsWith("https://")) raw else "http://$raw"
-                val baseUrl = if (withScheme.endsWith("/")) withScheme else "$withScheme/"
+                val baseUrl = if (raw.endsWith("/")) raw else "$raw/"
                 RetrofitClient.updateBaseUrl(baseUrl)
                 
                 val session = repository.login(LoginParams(username, password))
