@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,6 +21,7 @@ import com.example.oasis_mobile_client.R
 fun HistoryDialog(
     items: List<ChatViewModel.ChatSummary>,
     onSelect: (String, String?) -> Unit,
+    onDelete: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -31,11 +34,23 @@ fun HistoryDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onSelect(s.id, s.title) }
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(s.title.ifBlank { s.id })
+                            Text(
+                                text = s.title.ifBlank { s.id },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { onSelect(s.id, s.title) }
+                                    .padding(vertical = 8.dp)
+                            )
+                            IconButton(onClick = { onDelete(s.id) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }

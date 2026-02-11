@@ -653,6 +653,22 @@ open class ChatViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun deleteChat(id: String) {
+        val currentSessionId = sessionId ?: return
+        viewModelScope.launch {
+            runCatching { repository.deleteChat(currentSessionId, id) }
+                .onSuccess {
+                    if (chatId == id) {
+                        startNewChat()
+                    }
+                    refreshHistory()
+                }
+                .onFailure { e ->
+                    handleApiError(e)
+                }
+        }
+    }
+
     fun dismissRebootBanner() {
         _rebootBanner.value = false
     }

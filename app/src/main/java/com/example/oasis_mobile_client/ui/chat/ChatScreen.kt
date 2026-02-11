@@ -357,6 +357,9 @@ fun ChatScreen(viewModel: ChatViewModel) {
                 viewModel.loadChatById(id, title)
                 openHistoryDialog = false
             },
+            onDelete = { id ->
+                viewModel.deleteChat(id)
+            },
             onDismiss = { openHistoryDialog = false }
         )
     }

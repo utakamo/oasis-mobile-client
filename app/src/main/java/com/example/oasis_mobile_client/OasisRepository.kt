@@ -464,4 +464,15 @@ class OasisRepository(private val context: Context) {
             out
         }
     }
+
+    suspend fun deleteChat(sessionId: String, chatId: String) {
+        val requestParams = buildJsonArray {
+            add(sessionId)
+            add(UBUS_OBJECT_OASIS_CHAT)
+            add("delete")
+            add(buildJsonObject { put("id", chatId) })
+        }
+        val request = JsonRpcRequest(method = JsonRpcRequest.METHOD_CALL, params = requestParams)
+        makeRpcCall(request) { _ -> Unit }
+    }
 }
